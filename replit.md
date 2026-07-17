@@ -1,45 +1,53 @@
-# [Project name]
+# Project Antigravity
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A cross-platform dark-mode music streaming app that lets you search YouTube for any song and play audio ad-free in a custom neon-purple interface.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/mobile run dev` — start the Expo mobile app
+- `pnpm --filter @workspace/api-server run dev` — start the API server (port 8080)
 - `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks from the OpenAPI spec
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- **Frontend**: Expo (React Native), expo-router, expo-av, expo-blur, expo-linear-gradient
+- **Backend**: Node.js + Express 5, play-dl (YouTube search & stream)
+- **State**: React Context (AudioContext) + AsyncStorage for persistence
+- **API**: pnpm workspaces, OpenAPI + Orval codegen, @tanstack/react-query
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/mobile/` — Expo app
+  - `app/(tabs)/` — Home, Search, Library screens
+  - `context/AudioContext.tsx` — global audio playback state (source of truth)
+  - `components/MiniPlayer.tsx` — floating mini player above tab bar
+  - `components/PlayerModal.tsx` — full-screen player modal
+  - `constants/colors.ts` — dark neon-purple design tokens
+- `artifacts/api-server/src/routes/` — Express routes
+  - `search.ts` — `GET /api/search?q=` using play-dl
+  - `stream.ts` — `GET /api/stream/:id` pipes YouTube audio
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- **Audio proxied through backend**: play-dl streams audio server-side and pipes it to the Expo client via `Audio.Sound.createAsync({ uri: streamUrl })`. This avoids CORS issues and keeps YouTube URLs server-side.
+- **Ref-based callback pattern**: AudioContext uses `useRef` for mutable values (queue, index, repeat, shuffle) read inside the expo-av playback status callback to avoid stale closures without complex re-subscription logic.
+- **Forced dark mode**: `userInterfaceStyle: "dark"` in app.json ensures the system always reports dark mode, so `useColors()` always returns the dark palette.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **Home**: Quick Mix genre tiles + Recently Played horizontal scroll
+- **Search**: Real-time YouTube search with debounce, play / add-to-queue
+- **Library**: Recently played track list, persisted via AsyncStorage
+- **Mini Player**: Floating above the tab bar with progress bar
+- **Full Player**: Full-screen modal with album art blur, scrub bar, shuffle/repeat, volume
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+_Populate as you build._
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- The backend uses `play-dl` as an `external` in esbuild (never bundle it — it has native deps)
+- expo-av is deprecated in SDK 54 but still works. Migrate to `expo-audio` when ready.
+- Stream endpoint proxies audio; scrubbing works via expo-av's `setPositionAsync` but depends on buffering.

@@ -1,0 +1,20 @@
+Act as an elite Senior Full-Stack Engineer and Lead UI/UX Designer. Build a cross-platform mobile music streaming app using React Native (Expo) and a lightweight Node.js/Express backend. Codename: Project Antigravity. 
+
+The primary feature of this app is allowing the user to search for any song, fetch the audio stream via public streaming APIs (like YouTube Data API v3 or SoundCloud API), and play the audio seamlessly in a custom, clean interface with absolutely no third-party banner or popup ads.
+
+Please generate the complete codebase architecture, including:
+
+1. UI/UX FRONTEND (React Native + Tailwind CSS / NativeWind):
+- Theme: Deep dark mode (pure black #000000 backgrounds) with a vibrant, modern neon accent color (e.g., Electric Purple or Mint Green).
+- Clean Home Screen: A minimalist search bar at the top, a "Recently Played" horizontal scrolling grid, and a "Quick Mix" card.
+- Modern Player UI: A beautiful full-screen player that slides up from the bottom. Include a smooth, high-resolution blurred album art background, large minimalist playback controls (Play/Pause, Skip, Previous, Shuffle, Repeat), a flowing scrub bar tracking time elapsed, and a prominent volume slider.
+- State Management: Use React Context or Zustand to manage global audio playback states seamlessly across the entire app so music plays uninterrupted while browsing.
+
+2. BACKEND & API INTEGRATION (Node.js + Express):
+- A secure search endpoint `/api/search?q=song+name` that queries public video/audio streaming APIs, filters out heavy video data, and returns a clean JSON list of song titles, artist names, duration, unique video/audio IDs, and high-res thumbnail URLs.
+- An audio streaming endpoint `/api/stream/:id` that extracts the direct audio-only stream URL using legal open-source scraping/streaming libraries (like ytdl-core or play-dl) so the mobile app can play the audio smoothly without loading full video ads.
+
+3. CORE UTILITIES:
+- Integrate expo-av or react-native-track-player for robust background audio playback, ensuring the music keeps playing even when the phone screen is turned off or the app is minimized.
+
+Provide a step-by-step setup guide, the full package.json dependencies, the backend server script, and the primary React Native front-end components. Make the code highly modular, clean, scalable, and easy to deploy.

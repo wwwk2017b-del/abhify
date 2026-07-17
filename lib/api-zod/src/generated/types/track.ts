@@ -5,9 +5,6 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface HealthStatus {
-  status: string;
-}
 
 export interface Track {
   id: string;
@@ -20,19 +17,3 @@ export interface Track {
   /** Thumbnail URL */
   thumbnail: string;
 }
-
-export interface ApiError {
-  error: string;
-}
-
-export type SearchTracksParams = {
-/**
- * Search query
- */
-q: string;
-/**
- * Maximum number of results
- */
-limit?: number;
-};
-

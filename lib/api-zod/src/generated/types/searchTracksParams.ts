@@ -6,7 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export * from './apiError';
-export * from './healthStatus';
-export * from './searchTracksParams';
-export * from './track';
+export type SearchTracksParams = {
+/**
+ * Search query
+ */
+q: string;
+/**
+ * Maximum number of results
+ */
+limit?: number;
+};
