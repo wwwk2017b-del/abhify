@@ -56,7 +56,7 @@ function buildFloaties(): FloatieConfig[] {
       driftXRange: seededFloat(s * 5, 28, 70),
       driftYRange: seededFloat(s * 13, 22, 55),
       rotateDeg: seededFloat(s * 17, 10, 28),
-      opacity: seededFloat(s * 19, 0.16, 0.28),
+      opacity: seededFloat(s * 19, 0.28, 0.48),
       driftSpeed: seededFloat(s * 23, 5500, 11000),
       phaseOffset: seededFloat(s * 29, 0, 1),
       borderRadius: seededFloat(s * 31, 6, 24),

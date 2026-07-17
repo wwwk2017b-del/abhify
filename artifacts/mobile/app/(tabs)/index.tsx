@@ -17,6 +17,7 @@ import { useColors } from '@/hooks/useColors';
 import { useAudio } from '@/context/AudioContext';
 import { PlayerModal } from '@/components/PlayerModal';
 import { Butterflies } from '@/components/Butterflies';
+import { FloatingImages } from '@/components/FloatingImages';
 import { Track } from '@/types';
 
 const QUICK_MIX = [
@@ -67,8 +68,9 @@ export default function HomeScreen() {
         />
       </View>
 
-      {/* Animated butterflies in background */}
+      {/* Animated butterflies + user sticker images floating in background */}
       <Butterflies />
+      <FloatingImages />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
