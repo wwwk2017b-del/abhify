@@ -1,0 +1,23 @@
+Act as an elite Performance Engineer and Lead UI/UX Designer. Execute the following high-priority updates for the "Abhify" (React Native/Expo) codebase to prepare it for production.
+
+---TASK 1: Language & Core UI Audit---
+Ensure 100% of the text throughout the entire application (User Interface, buttons, labels, and console logs) is rendered in standard, clean English. Finalize the app name header as "Abhify" with a clean, light sans-serif font.
+
+---TASK 2: Performance Hyper-Optimization---
+1. Audit all primary components and apply React.memo, useCallback, and useMemo where necessary to prevent unnecessary re-renders during high-stress audio playback.
+2. Implement optimized lazy-loading for all images and visual assets.
+3. If not already used, replace any heavy scrolling views with optimized FlatList or FlashList implementations for song lists.
+4. If an external streaming API is used (e.g., YouTube), refine the backend parsing to minimize JSON payload size, keeping the stream link extraction lightning fast.
+
+---TASK 3: Aesthetic Animation Layer (Light Purple Butterflies)---
+Introduce a dedicated animation layer using react-native-reanimated (or Lottie if faster).
+1. Add multiple small, elegant, light purple (#D8B4FE) butterfly assets floating subtly in the background.
+2. Animate these butterflies using complex, non-linear, slow-motion paths that cause them to gently revolve around the main central music player controls and the album art card.
+3. The movement must be organic and randomized, not a simple circle.
+
+---TASK 4: Feature "Beyond Imagination" - The Kinetic Audio Waveform---
+Replace the static scrub bar/timeline with a dynamic, kinetic audio visualizer waveform (a bar or line visualizer).
+1. This visualizer must not be a canned loop; it must dynamically react to the frequency and amplitude data of the *currently playing audio stream* (or fake it convincingly using audio-analysis logic on the stream ID).
+2. The UI controls (play, pause, skip) and the revolving butterflies must subtly "pulse" or vibrate in sync with the bass peaks of the music. This creates an immersive, "antigravity" feel where the UI itself is alive with the sound.
+
+Maintain high code quality and provide an summary of the optimization changes made.

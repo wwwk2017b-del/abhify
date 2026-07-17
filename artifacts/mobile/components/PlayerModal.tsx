@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -9,17 +9,25 @@ import {
   Dimensions,
   Platform,
   ActivityIndicator,
-  ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { useColors } from '@/hooks/useColors';
 import { useAudio } from '@/context/AudioContext';
+import { Butterflies } from '@/components/Butterflies';
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+const { width: SCREEN_W } = Dimensions.get('window');
 
 const formatTime = (ms: number): string => {
   const totalSecs = Math.floor(ms / 1000);
@@ -39,7 +47,6 @@ export function PlayerModal() {
     durationMs,
     shuffle,
     repeat,
-    volume,
     showPlayer,
     setShowPlayer,
     togglePlay,
@@ -48,7 +55,6 @@ export function PlayerModal() {
     skipPrev,
     toggleShuffle,
     toggleRepeat,
-    setVolume,
   } = useAudio();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -58,16 +64,69 @@ export function PlayerModal() {
   const displayMs = isDragging ? dragMs : positionMs;
   const progress = durationMs > 0 ? displayMs / durationMs : 0;
 
-  // Swipe down to close
+  // ── Kinetic pulse on play button ───────────────────────────────────────────
+  const playScale = useSharedValue(1);
+  const playGlow = useSharedValue(0.7);
+
+  useEffect(() => {
+    if (isPlaying) {
+      playScale.value = withRepeat(
+        withSequence(
+          withTiming(1.08, { duration: 420, easing: Easing.inOut(Easing.sin) }),
+          withTiming(0.96, { duration: 420, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
+        false,
+      );
+      playGlow.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 420, easing: Easing.inOut(Easing.sin) }),
+          withTiming(0.5, { duration: 420, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
+        false,
+      );
+    } else {
+      playScale.value = withTiming(1, { duration: 250 });
+      playGlow.value = withTiming(0.7, { duration: 250 });
+    }
+  }, [isPlaying]);
+
+  // ── Skip buttons pulse on tap ──────────────────────────────────────────────
+  const skipNextScale = useSharedValue(1);
+  const skipPrevScale = useSharedValue(1);
+
+  const pulseTap = (sv: typeof skipNextScale) => {
+    sv.value = withSequence(
+      withTiming(0.82, { duration: 90 }),
+      withTiming(1.1, { duration: 130 }),
+      withTiming(1, { duration: 120 }),
+    );
+  };
+
+  const playBtnStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: playScale.value }],
+    shadowOpacity: playGlow.value * 0.75,
+  }));
+
+  const skipNextStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: skipNextScale.value }],
+  }));
+  const skipPrevStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: skipPrevScale.value }],
+  }));
+
+  // ── Swipe down to dismiss ──────────────────────────────────────────────────
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, g) => g.dy > 15 && Math.abs(g.dx) < Math.abs(g.dy),
+    onMoveShouldSetPanResponder: (_, g) =>
+      g.dy > 15 && Math.abs(g.dx) < Math.abs(g.dy),
     onPanResponderRelease: (_, g) => {
       if (g.dy > 80) setShowPlayer(false);
     },
   });
 
-  // Progress bar scrubbing
+  // ── Scrub bar ──────────────────────────────────────────────────────────────
   const scrubPan = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
@@ -86,12 +145,10 @@ export function PlayerModal() {
     },
   });
 
-  if (!currentTrack) return null;
+  const repeatIcon = repeat === 'one' ? 'repeat-once' : 'repeat';
+  const repeatColor = repeat !== 'none' ? colors.primary : colors.mutedForeground;
 
-  const repeatIcon =
-    repeat === 'one' ? 'repeat-once' : repeat === 'all' ? 'repeat' : 'repeat';
-  const repeatColor =
-    repeat !== 'none' ? colors.primary : colors.mutedForeground;
+  if (!currentTrack) return null;
 
   return (
     <Modal
@@ -100,144 +157,162 @@ export function PlayerModal() {
       presentationStyle="fullScreen"
       onRequestClose={() => setShowPlayer(false)}
     >
-      <View style={[styles.container, { backgroundColor: '#000' }]} {...panResponder.panHandlers}>
-        {/* Blurred album art background */}
+      <View style={styles.root} {...panResponder.panHandlers}>
+        {/* Deep nebula background */}
+        <LinearGradient
+          colors={['#0C0221', '#1A0540', '#0C0221']}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+        />
+
+        {/* Nebula glow orb behind album art */}
+        <View style={styles.glowOrb} pointerEvents="none">
+          <LinearGradient
+            colors={['#7C3AED44', '#A855F722', 'transparent']}
+            style={styles.glowGradient}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+          />
+        </View>
+
+        {/* Butterflies float in the background */}
+        <Butterflies />
+
+        {/* Album art blurred bg */}
         <Image
           source={{ uri: currentTrack.thumbnail }}
-          style={StyleSheet.absoluteFill}
+          style={[StyleSheet.absoluteFill, { opacity: 0.08 }]}
           contentFit="cover"
-          blurRadius={Platform.OS === 'android' ? 10 : 0}
+          blurRadius={Platform.OS === 'android' ? 20 : 0}
         />
         {Platform.OS !== 'android' && (
-          <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={50} tint="dark" style={[StyleSheet.absoluteFill, { opacity: 0.4 }]} />
         )}
-        <LinearGradient
-          colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.92)', '#000']}
-          style={StyleSheet.absoluteFill}
-          locations={[0, 0.4, 1]}
-        />
 
         {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <TouchableOpacity onPress={() => setShowPlayer(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons name="chevron-down" size={28} color="#fff" />
+          <TouchableOpacity
+            onPress={() => setShowPlayer(false)}
+            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+          >
+            <Ionicons name="chevron-down" size={28} color={colors.lavender} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Now Playing</Text>
+          <Text style={[styles.headerTitle, { color: colors.mutedForeground }]}>
+            Now Playing
+          </Text>
           <View style={{ width: 28 }} />
         </View>
 
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={false}
-        >
-          {/* Album Art */}
-          <View style={styles.artContainer}>
-            <Image
-              source={{ uri: currentTrack.thumbnail }}
-              style={styles.albumArt}
-              contentFit="cover"
+        {/* Album Art */}
+        <View style={styles.artWrap}>
+          <Image
+            source={{ uri: currentTrack.thumbnail }}
+            style={styles.albumArt}
+            contentFit="cover"
+          />
+          {/* Glow ring around art */}
+          <View style={[styles.artGlow, { shadowColor: colors.neonPurple }]} />
+        </View>
+
+        {/* Track info */}
+        <View style={styles.trackInfo}>
+          <Text style={[styles.trackTitle, { color: colors.foreground }]} numberOfLines={2}>
+            {currentTrack.title}
+          </Text>
+          <Text style={[styles.trackArtist, { color: colors.mutedForeground }]}>
+            {currentTrack.artist}
+          </Text>
+        </View>
+
+        {/* Progress bar */}
+        <View style={styles.progressSection}>
+          <View
+            style={[styles.progressBar, { backgroundColor: colors.border }]}
+            onLayout={(e) => { barWidthRef.current = e.nativeEvent.layout.width; }}
+            {...scrubPan.panHandlers}
+          >
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${Math.min(progress * 100, 100)}%`, backgroundColor: colors.primary },
+              ]}
+            />
+            <View
+              style={[styles.progressThumb, { left: `${Math.min(progress * 100, 100)}%`, backgroundColor: colors.lavender }]}
             />
           </View>
-
-          {/* Track Info */}
-          <View style={styles.trackInfo}>
-            <Text style={styles.trackTitle} numberOfLines={2}>
-              {currentTrack.title}
+          <View style={styles.timeRow}>
+            <Text style={[styles.timeText, { color: colors.mutedForeground }]}>
+              {formatTime(displayMs)}
             </Text>
-            <Text style={[styles.trackArtist, { color: colors.mutedForeground }]}>
-              {currentTrack.artist}
+            <Text style={[styles.timeText, { color: colors.mutedForeground }]}>
+              {formatTime(durationMs)}
             </Text>
           </View>
+        </View>
 
-          {/* Progress Bar */}
-          <View style={styles.progressSection}>
-            <View
-              style={[styles.progressBar, { backgroundColor: colors.border }]}
-              onLayout={(e) => { barWidthRef.current = e.nativeEvent.layout.width; }}
-              {...scrubPan.panHandlers}
-            >
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${Math.min(progress * 100, 100)}%`, backgroundColor: colors.primary },
-                ]}
-              />
-              <View
-                style={[
-                  styles.progressThumb,
-                  {
-                    left: `${Math.min(progress * 100, 100)}%`,
-                    backgroundColor: '#fff',
-                    marginLeft: -8,
-                  },
-                ]}
-              />
-            </View>
-            <View style={styles.timeRow}>
-              <Text style={[styles.timeText, { color: colors.mutedForeground }]}>
-                {formatTime(displayMs)}
-              </Text>
-              <Text style={[styles.timeText, { color: colors.mutedForeground }]}>
-                {formatTime(durationMs)}
-              </Text>
-            </View>
-          </View>
+        {/* Controls — frosted glass panel */}
+        <View style={styles.controlsOuter}>
+          <BlurView intensity={40} tint="dark" style={styles.controlsBlur} />
+          <View style={[styles.controlsBorder, { borderColor: colors.border }]} />
 
-          {/* Controls */}
           <View style={styles.controls}>
-            <TouchableOpacity onPress={toggleShuffle} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons
-                name="shuffle"
-                size={24}
-                color={shuffle ? colors.primary : colors.mutedForeground}
-              />
+            {/* Shuffle */}
+            <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} onPress={toggleShuffle}>
+              <Ionicons name="shuffle" size={24} color={shuffle ? colors.primary : colors.mutedForeground} />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={skipPrev} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="play-skip-back" size={36} color="#fff" />
-            </TouchableOpacity>
+            {/* Prev */}
+            <Animated.View style={skipPrevStyle}>
+              <TouchableOpacity
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                onPress={() => { pulseTap(skipPrevScale); skipPrev(); }}
+              >
+                <Ionicons name="play-skip-back" size={36} color={colors.foreground} />
+              </TouchableOpacity>
+            </Animated.View>
 
-            <TouchableOpacity
-              onPress={togglePlay}
-              style={[styles.playButton, { backgroundColor: colors.primary }]}
-              activeOpacity={0.8}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Ionicons name={isPlaying ? 'pause' : 'play'} size={32} color="#fff" />
-              )}
-            </TouchableOpacity>
+            {/* Play/Pause — pulsing kinetic button */}
+            <Animated.View style={[styles.playBtnWrap, playBtnStyle]}>
+              <TouchableOpacity
+                onPress={togglePlay}
+                style={[styles.playButton, { backgroundColor: colors.primary }]}
+                activeOpacity={0.85}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Ionicons name={isPlaying ? 'pause' : 'play'} size={32} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </Animated.View>
 
-            <TouchableOpacity onPress={skipNext} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="play-skip-forward" size={36} color="#fff" />
-            </TouchableOpacity>
+            {/* Next */}
+            <Animated.View style={skipNextStyle}>
+              <TouchableOpacity
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                onPress={() => { pulseTap(skipNextScale); skipNext(); }}
+              >
+                <Ionicons name="play-skip-forward" size={36} color={colors.foreground} />
+              </TouchableOpacity>
+            </Animated.View>
 
-            <TouchableOpacity onPress={toggleRepeat} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            {/* Repeat */}
+            <TouchableOpacity hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} onPress={toggleRepeat}>
               <MaterialCommunityIcons name={repeatIcon} size={24} color={repeatColor} />
             </TouchableOpacity>
           </View>
+        </View>
 
-          {/* Volume */}
-          <View style={styles.volumeRow}>
-            <Ionicons name="volume-low" size={18} color={colors.mutedForeground} />
-            <View style={[styles.volumeTrack, { backgroundColor: colors.border }]}>
-              <View
-                style={[styles.volumeFill, { width: `${volume * 100}%`, backgroundColor: colors.primary }]}
-              />
-            </View>
-            <Ionicons name="volume-high" size={18} color={colors.mutedForeground} />
-          </View>
-        </ScrollView>
+        <View style={{ height: insets.bottom + 24 }} />
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
   },
   header: {
@@ -246,54 +321,69 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 24,
     paddingBottom: 8,
+    zIndex: 10,
   },
   headerTitle: {
-    color: '#fff',
     fontSize: 13,
     fontFamily: 'Inter_600SemiBold',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
-    opacity: 0.7,
   },
-  scroll: {
+  glowOrb: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '65%',
+    zIndex: 0,
+  },
+  glowGradient: {
     flex: 1,
   },
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    gap: 24,
-  },
-  artContainer: {
+  artWrap: {
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 12,
+    zIndex: 10,
   },
   albumArt: {
-    width: SCREEN_W - 80,
-    height: SCREEN_W - 80,
-    borderRadius: 16,
+    width: SCREEN_W - 72,
+    height: SCREEN_W - 72,
+    borderRadius: 20,
+  },
+  artGlow: {
+    position: 'absolute',
+    width: SCREEN_W - 72,
+    height: SCREEN_W - 72,
+    borderRadius: 20,
     shadowColor: '#A855F7',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 32,
+    elevation: 0,
   },
   trackInfo: {
     alignItems: 'center',
-    gap: 4,
+    paddingHorizontal: 28,
+    marginTop: 24,
+    gap: 6,
+    zIndex: 10,
   },
   trackTitle: {
-    color: '#fff',
-    fontSize: 22,
+    fontSize: 20,
     fontFamily: 'Inter_700Bold',
     textAlign: 'center',
-    lineHeight: 28,
+    lineHeight: 26,
   },
   trackArtist: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: 'Inter_500Medium',
     textAlign: 'center',
   },
   progressSection: {
+    paddingHorizontal: 24,
+    marginTop: 28,
     gap: 8,
+    zIndex: 10,
   },
   progressBar: {
     height: 4,
@@ -310,6 +400,7 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
+    marginLeft: -8,
   },
   timeRow: {
     flexDirection: 'row',
@@ -319,10 +410,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
   },
+  controlsOuter: {
+    marginHorizontal: 16,
+    marginTop: 28,
+    borderRadius: 20,
+    overflow: 'hidden',
+    zIndex: 10,
+  },
+  controlsBlur: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  controlsBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+  },
+  playBtnWrap: {
+    shadowColor: '#A855F7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 18,
+    elevation: 12,
   },
   playButton: {
     width: 72,
@@ -330,24 +444,5 @@ const styles = StyleSheet.create({
     borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#A855F7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  volumeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  volumeTrack: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-  },
-  volumeFill: {
-    height: '100%',
-    borderRadius: 2,
   },
 });

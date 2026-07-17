@@ -8,6 +8,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -29,6 +30,13 @@ export default function LibraryScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <LinearGradient
+        colors={['#1A0540', '#0C0221', '#0A001A']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+      />
+
       <FlatList
         data={recentlyPlayed}
         keyExtractor={(item) => item.id}
@@ -41,7 +49,7 @@ export default function LibraryScreen() {
         )}
         ListHeaderComponent={
           <View style={[styles.header, { paddingTop: topPad + 20 }]}>
-            <Text style={[styles.heading, { color: colors.foreground }]}>Library</Text>
+            <Text style={[styles.heading, { color: colors.lavender }]}>Library</Text>
             {recentlyPlayed.length > 0 && (
               <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
                 {recentlyPlayed.length} track{recentlyPlayed.length !== 1 ? 's' : ''}
@@ -52,7 +60,7 @@ export default function LibraryScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="library-outline" size={52} color={colors.mutedForeground} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+            <Text style={[styles.emptyTitle, { color: colors.lavender }]}>
               Your library is empty
             </Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
@@ -80,9 +88,7 @@ export default function LibraryScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
+  root: { flex: 1 },
   header: {
     paddingHorizontal: 20,
     paddingBottom: 20,

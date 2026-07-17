@@ -16,37 +16,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useAudio } from '@/context/AudioContext';
 import { PlayerModal } from '@/components/PlayerModal';
-import { FloatingImages } from '@/components/FloatingImages';
+import { Butterflies } from '@/components/Butterflies';
 import { Track } from '@/types';
 
 const QUICK_MIX = [
-  { id: 'qm1', label: 'Hip-Hop', query: 'hip hop hits 2024', color: '#7C3AED' as const },
-  { id: 'qm2', label: 'Electronic', query: 'electronic music mix', color: '#2563EB' as const },
-  { id: 'qm3', label: 'Chill', query: 'chill lo-fi beats', color: '#059669' as const },
-  { id: 'qm4', label: 'Rock', query: 'rock classics best', color: '#DC2626' as const },
-  { id: 'qm5', label: 'Pop Hits', query: 'pop hits 2024', color: '#D97706' as const },
-  { id: 'qm6', label: 'Jazz', query: 'jazz soul music', color: '#7C3AED' as const },
+  { id: 'qm1', label: 'Hip-Hop',    query: 'hip hop hits 2024',       colors: ['#7C3AED', '#4C1D95'] as const },
+  { id: 'qm2', label: 'Electronic', query: 'electronic music mix',     colors: ['#5B21B6', '#1E3A8A'] as const },
+  { id: 'qm3', label: 'Chill',      query: 'chill lo-fi beats',        colors: ['#6D28D9', '#065F46'] as const },
+  { id: 'qm4', label: 'Rock',       query: 'rock classics best',       colors: ['#7C3AED', '#7F1D1D'] as const },
+  { id: 'qm5', label: 'Pop Hits',   query: 'pop hits 2024',            colors: ['#A855F7', '#6D28D9'] as const },
+  { id: 'qm6', label: 'Jazz',       query: 'jazz soul music',          colors: ['#5B21B6', '#4A1942'] as const },
 ];
 
-const MINI_PLAYER_EXTRA = 76; // mini player height + gap
 const TAB_BAR_H = Platform.OS === 'web' ? 84 : Platform.OS === 'ios' ? 49 : 56;
+const MINI_PLAYER_EXTRA = 76;
 
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { recentlyPlayed, playTrack, currentTrack, showPlayer, setShowPlayer } = useAudio();
+  const { recentlyPlayed, playTrack, currentTrack } = useAudio();
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = insets.bottom + TAB_BAR_H + (currentTrack ? MINI_PLAYER_EXTRA : 0);
-
-  const handleQuickMix = (query: string) => {
-    router.push({ pathname: '/(tabs)/search', params: { q: query } });
-  };
-
-  const handleTrackPress = (track: Track) => {
-    playTrack(track, recentlyPlayed);
-  };
 
   const getGreeting = () => {
     const h = new Date().getHours();
@@ -57,8 +49,26 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      {/* Floating sticker background */}
-      <FloatingImages />
+      {/* Deep nebula gradient background */}
+      <LinearGradient
+        colors={['#1A0540', '#0C0221', '#0A001A']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+      />
+
+      {/* Purple glow orb at top */}
+      <View style={styles.topGlow} pointerEvents="none">
+        <LinearGradient
+          colors={['#7C3AED33', '#A855F711', 'transparent']}
+          style={{ flex: 1 }}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+        />
+      </View>
+
+      {/* Animated butterflies in background */}
+      <Butterflies />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -70,9 +80,9 @@ export default function HomeScreen() {
             <Text style={[styles.greeting, { color: colors.mutedForeground }]}>
               {getGreeting()}
             </Text>
-            <Text style={[styles.appName, { color: colors.foreground }]}>Abhify</Text>
+            <Text style={[styles.appName, { color: colors.lavender }]}>Abhify</Text>
           </View>
-          <View style={[styles.logoWrap, { backgroundColor: colors.muted }]}>
+          <View style={[styles.logoWrap, { backgroundColor: '#2A1045' }]}>
             <Ionicons name="musical-notes" size={22} color={colors.primary} />
           </View>
         </View>
@@ -83,17 +93,17 @@ export default function HomeScreen() {
           {QUICK_MIX.map((item) => (
             <TouchableOpacity
               key={item.id}
-              style={[styles.quickTile, { borderRadius: colors.radius }]}
-              onPress={() => handleQuickMix(item.query)}
+              style={[styles.quickTile, { borderRadius: colors.radius, borderColor: colors.border + '80' }]}
+              onPress={() => router.push({ pathname: '/(tabs)/search', params: { q: item.query } })}
               activeOpacity={0.75}
             >
               <LinearGradient
-                colors={[item.color, '#000']}
+                colors={item.colors}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[StyleSheet.absoluteFill, { borderRadius: colors.radius }]}
               />
-              <Ionicons name="musical-note" size={18} color="rgba(255,255,255,0.6)" />
+              <Ionicons name="musical-note" size={16} color="rgba(216,180,254,0.7)" />
               <Text style={styles.quickLabel}>{item.label}</Text>
             </TouchableOpacity>
           ))}
@@ -113,7 +123,7 @@ export default function HomeScreen() {
               contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  onPress={() => handleTrackPress(item)}
+                  onPress={() => playTrack(item, recentlyPlayed)}
                   activeOpacity={0.75}
                   style={styles.recentCard}
                 >
@@ -122,8 +132,13 @@ export default function HomeScreen() {
                     style={[styles.recentArt, { borderRadius: colors.radius }]}
                     contentFit="cover"
                   />
+                  {/* Purple overlay on recent art */}
+                  <LinearGradient
+                    colors={['transparent', '#0C022188']}
+                    style={[StyleSheet.absoluteFill, { borderRadius: colors.radius, height: 130, top: 0 }]}
+                  />
                   <Text
-                    style={[styles.recentTitle, { color: colors.foreground }]}
+                    style={[styles.recentTitle, { color: colors.lavender }]}
                     numberOfLines={2}
                   >
                     {item.title}
@@ -141,7 +156,7 @@ export default function HomeScreen() {
         ) : (
           <View style={[styles.emptyState, { borderColor: colors.border }]}>
             <Ionicons name="headset-outline" size={42} color={colors.mutedForeground} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+            <Text style={[styles.emptyTitle, { color: colors.lavender }]}>
               No recent plays yet
             </Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
@@ -151,15 +166,20 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      {/* Full-screen player */}
       <PlayerModal />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
+  root: { flex: 1 },
+  topGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 300,
+    zIndex: 0,
   },
   header: {
     flexDirection: 'row',
@@ -167,6 +187,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     marginBottom: 28,
+    zIndex: 10,
   },
   greeting: {
     fontSize: 13,
@@ -174,14 +195,14 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   appName: {
-    fontSize: 26,
+    fontSize: 28,
     fontFamily: 'Inter_700Bold',
-    letterSpacing: -0.5,
+    letterSpacing: 0.5,
   },
   logoWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -191,6 +212,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 14,
     marginTop: 8,
+    zIndex: 10,
   },
   quickGrid: {
     flexDirection: 'row',
@@ -198,6 +220,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 10,
     marginBottom: 28,
+    zIndex: 10,
   },
   quickTile: {
     width: '31%',
@@ -207,10 +230,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     padding: 10,
     gap: 2,
+    borderWidth: 1,
   },
   quickLabel: {
-    color: '#fff',
-    fontSize: 13,
+    color: '#F3E8FF',
+    fontSize: 12,
     fontFamily: 'Inter_700Bold',
   },
   recentCard: {
@@ -240,6 +264,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     borderRadius: 16,
     gap: 10,
+    zIndex: 10,
   },
   emptyTitle: {
     fontSize: 17,

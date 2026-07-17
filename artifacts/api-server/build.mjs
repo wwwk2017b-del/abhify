@@ -30,6 +30,7 @@ async function buildAll() {
     external: [
       "*.node",
       "play-dl",
+      "@distube/ytdl-core",
       "sharp",
       "better-sqlite3",
       "sqlite3",

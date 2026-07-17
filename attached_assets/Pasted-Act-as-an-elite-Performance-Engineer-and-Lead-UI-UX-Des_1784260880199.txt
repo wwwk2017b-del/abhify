@@ -1,0 +1,25 @@
+Act as an elite Performance Engineer and Lead UI/UX Designer (specializing in premium, high-end mobile aesthetics). Execute the following high-priority updates, critical bug fixes, and visual overhaul for the "Abhify" (React Native/Expo) codebase.
+
+---TASK 1: CRITICAL BUG FIX & UNIVERSAL YOUTUBE SEARCH---
+Issue: Currently, when a user searches for a song and clicks 'Play', the audio fails to start. Additionally, the search must be able to find any song the user wants.
+Required Fixes:
+1. Universal Search Integration: Wire the search bar to query the entire YouTube database. Whatever text the user types MUST reliably return the top relevant YouTube audio/video results so they can access any song in existence.
+2. Debug Stream Extraction: Ensure the backend/frontend extraction logic (e.g., ytdl-core or similar) is successfully bypassing 403 errors and extracting a direct, playable audio URL from the searched video ID.
+3. Player State & Initialization: Verify that the audio player (expo-av) is correctly initialized and that the audio URL is successfully being passed to `loadAsync`. Add a visual loading spinner on the Play button during fetching.
+4. Fallback & Error UI: Add robust `console.log` error handling around playback so the console logs the exact error.
+
+---TASK 2: ELITE-CLASS PURPLE GRAPHICS OVERHAUL---
+Goal: Transition from a flat black UI to a premium, layered visual interface dominated by rich, deep purple effects.
+1. Theme Shift: Change the primary background from pure black to a very deep, sophisticated indigo/purple (e.g., #0C0221 or #0A001A). 
+2. Glowing Accents: Implement radial or linear gradients subtly behind the main player controls to create a "nebula" or "soft glow" effect. Use a brighter neon purple (#A855F7) or vibrant lavender (#E9D5FF) for accent colors (e.g., icons, active states).
+3. Depth (Glassmorphism): If possible with current constraints, add a slight frosted-glass blur effect to the background of the player controls panel, allowing the background purple glow and revolving butterflies to be visible but slightly diffused underneath.
+4. Text & Metadata: Ensure all song metadata and titles are rendered in clean, muted lavender or crisp white for perfect readability against the deep background. App header must remain 'Abhify' in a clean, sophisticated sans-serif font.
+
+---TASK 3: Aesthetic Animation Layer (Light Purple Butterflies)---
+Introduce a dedicated animation layer using react-native-reanimated.
+1. Add small, elegant, light purple (#D8B4FE) butterfly assets floating subtly in the background layer.
+2. Animate these butterflies using non-linear, slow-motion paths that cause them to gently revolve around the main central music player controls. They must look ethereal and integrated into the new purple glow theme.
+
+---TASK 4: Feature "Beyond Imagination" - Kinetic UI & Language---
+1. Language Audit: Ensure 100% of the UI text is in standard, clean English.
+2. Kinetic Pulsing: Make the UI controls (play, pause, skip) and the revolving butterflies subtly "pulse" or vibrate as if reacting to the bass/beat of the music for an immersive "antigravity" feel.

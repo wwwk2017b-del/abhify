@@ -11,6 +11,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -25,7 +26,8 @@ const MINI_PLAYER_EXTRA = 76;
 
 const SUGGESTIONS = [
   'Kendrick Lamar', 'Taylor Swift', 'The Weeknd', 'Drake',
-  'Billie Eilish', 'Post Malone', 'Dua Lipa', 'Bad Bunny',
+  'Billie Eilish', 'Olivia Rodrigo', 'Dua Lipa', 'Bad Bunny',
+  'Lana Del Rey', 'Arctic Monkeys',
 ];
 
 export default function SearchScreen() {
@@ -37,7 +39,6 @@ export default function SearchScreen() {
   const [inputText, setInputText] = useState(params.q ?? '');
   const [debouncedQuery, setDebouncedQuery] = useState(params.q ?? '');
 
-  // Sync param changes (from Quick Mix)
   useEffect(() => {
     if (params.q) {
       setInputText(params.q);
@@ -45,7 +46,6 @@ export default function SearchScreen() {
     }
   }, [params.q]);
 
-  // Debounce
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(inputText.trim()), 450);
     return () => clearTimeout(t);
@@ -64,15 +64,6 @@ export default function SearchScreen() {
     playTrack(track as any, tracks as any);
   }, [playTrack, tracks]);
 
-  const handleAddToQueue = useCallback((track: Track) => {
-    addToQueue(track as any);
-  }, [addToQueue]);
-
-  const handleClear = () => {
-    setInputText('');
-    setDebouncedQuery('');
-  };
-
   const renderEmpty = () => {
     if (isLoading) return null;
     if (debouncedQuery.length === 0) {
@@ -86,9 +77,9 @@ export default function SearchScreen() {
               <TouchableOpacity
                 key={s}
                 onPress={() => setInputText(s)}
-                style={[styles.chip, { backgroundColor: colors.secondary, borderRadius: 20 }]}
+                style={[styles.chip, { backgroundColor: '#1A0935', borderColor: colors.border, borderRadius: 20 }]}
               >
-                <Text style={[styles.chipText, { color: colors.foreground }]}>{s}</Text>
+                <Text style={[styles.chipText, { color: colors.lavender }]}>{s}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -99,7 +90,7 @@ export default function SearchScreen() {
       return (
         <View style={styles.center}>
           <Ionicons name="cloud-offline-outline" size={48} color={colors.mutedForeground} />
-          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Search failed</Text>
+          <Text style={[styles.emptyTitle, { color: colors.lavender }]}>Search failed</Text>
           <TouchableOpacity
             onPress={() => refetch()}
             style={[styles.retryBtn, { backgroundColor: colors.primary, borderRadius: colors.radius }]}
@@ -112,7 +103,7 @@ export default function SearchScreen() {
     return (
       <View style={styles.center}>
         <Ionicons name="search-outline" size={48} color={colors.mutedForeground} />
-        <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No results found</Text>
+        <Text style={[styles.emptyTitle, { color: colors.lavender }]}>No results found</Text>
         <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
           Try a different search term
         </Text>
@@ -122,18 +113,27 @@ export default function SearchScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {/* Nebula gradient */}
+      <LinearGradient
+        colors={['#1A0540', '#0C0221']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+      />
+
       {/* Search bar */}
       <View style={[styles.searchBar, { paddingTop: topPad + 12 }]}>
+        <Text style={[styles.screenTitle, { color: colors.lavender }]}>Search</Text>
         <View
           style={[
             styles.inputWrap,
-            { backgroundColor: colors.secondary, borderRadius: colors.radius },
+            { backgroundColor: '#1A0935', borderRadius: colors.radius, borderColor: colors.border },
           ]}
         >
           <Ionicons name="search" size={18} color={colors.mutedForeground} />
           <TextInput
             style={[styles.input, { color: colors.foreground }]}
-            placeholder="Artists, songs, podcasts"
+            placeholder="Artists, songs, playlists"
             placeholderTextColor={colors.mutedForeground}
             value={inputText}
             onChangeText={setInputText}
@@ -143,24 +143,22 @@ export default function SearchScreen() {
             selectionColor={colors.primary}
           />
           {inputText.length > 0 && (
-            <TouchableOpacity onPress={handleClear}>
+            <TouchableOpacity onPress={() => { setInputText(''); setDebouncedQuery(''); }}>
               <Ionicons name="close-circle" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {/* Loading indicator */}
       {isLoading && (
         <View style={styles.loadingRow}>
           <ActivityIndicator color={colors.primary} size="small" />
           <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
-            Searching...
+            Searching…
           </Text>
         </View>
       )}
 
-      {/* Results */}
       <FlatList
         data={tracks}
         keyExtractor={(item) => item.id}
@@ -168,7 +166,7 @@ export default function SearchScreen() {
           <TrackCard
             track={item as any}
             onPress={() => handlePlay(item)}
-            onMorePress={() => handleAddToQueue(item)}
+            onMorePress={() => addToQueue(item as any)}
             index={index}
           />
         )}
@@ -184,19 +182,25 @@ export default function SearchScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
+  root: { flex: 1 },
   searchBar: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 12,
+    zIndex: 10,
+  },
+  screenTitle: {
+    fontSize: 26,
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: -0.5,
+    marginBottom: 14,
   },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 12,
-    height: 44,
+    height: 46,
+    borderWidth: 1,
   },
   input: {
     flex: 1,
@@ -207,7 +211,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 8,
   },
   loadingText: {
@@ -236,6 +240,7 @@ const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 7,
+    borderWidth: 1,
   },
   chipText: {
     fontSize: 13,

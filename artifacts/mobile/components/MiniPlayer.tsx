@@ -12,10 +12,10 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
 import { useAudio } from '@/context/AudioContext';
 
-// Approximate tab bar heights by platform
 const TAB_BAR_H = Platform.OS === 'web' ? 84 : Platform.OS === 'ios' ? 49 : 56;
 const MINI_PLAYER_H = 68;
 
@@ -26,6 +26,7 @@ export function MiniPlayer() {
     useAudio();
 
   const slideAnim = useRef(new Animated.Value(100)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (currentTrack) {
@@ -37,6 +38,21 @@ export function MiniPlayer() {
       }).start();
     }
   }, [currentTrack]);
+
+  // Kinetic pulse when playing
+  useEffect(() => {
+    if (isPlaying) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.18, duration: 430, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 0.92, duration: 430, useNativeDriver: true }),
+        ]),
+      ).start();
+    } else {
+      pulseAnim.stopAnimation();
+      Animated.timing(pulseAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    }
+  }, [isPlaying]);
 
   if (!currentTrack) return null;
 
@@ -50,7 +66,17 @@ export function MiniPlayer() {
         { bottom: tabBarBottom, transform: [{ translateY: slideAnim }] },
       ]}
     >
-      <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
+      {/* Nebula gradient background */}
+      <LinearGradient
+        colors={['#1A0540CC', '#0C0221EE']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+      <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+
+      {/* Purple border glow */}
+      <View style={[styles.glowBorder, { borderColor: colors.neonPurpleDim + '55' }]} />
 
       {/* Progress bar */}
       <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
@@ -70,7 +96,7 @@ export function MiniPlayer() {
         {/* Album art */}
         <Image
           source={{ uri: currentTrack.thumbnail }}
-          style={[styles.art, { borderRadius: colors.radius - 6 }]}
+          style={[styles.art, { borderRadius: colors.radius - 4 }]}
           contentFit="cover"
         />
 
@@ -84,23 +110,23 @@ export function MiniPlayer() {
           </Text>
         </View>
 
-        {/* Controls */}
-        <View style={styles.controls}>
-          <TouchableOpacity
-            onPress={togglePlay}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
+        {/* Pulsing play icon */}
+        <TouchableOpacity
+          onPress={togglePlay}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
             {isLoading ? (
               <ActivityIndicator color={colors.primary} size="small" />
             ) : (
               <Ionicons
                 name={isPlaying ? 'pause' : 'play'}
                 size={28}
-                color={colors.foreground}
+                color={colors.lavender}
               />
             )}
-          </TouchableOpacity>
-        </View>
+          </Animated.View>
+        </TouchableOpacity>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -112,14 +138,19 @@ const styles = StyleSheet.create({
     left: 8,
     right: 8,
     height: MINI_PLAYER_H,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: 'hidden',
     zIndex: 100,
-    shadowColor: '#000',
+    shadowColor: '#A855F7',
     shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
     elevation: 20,
+  },
+  glowBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+    borderWidth: 1,
   },
   progressTrack: {
     height: 2,
@@ -151,10 +182,5 @@ const styles = StyleSheet.create({
   artist: {
     fontSize: 11,
     fontFamily: 'Inter_400Regular',
-  },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
 });
