@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useAudio } from '@/context/AudioContext';
 import { PlayerModal } from '@/components/PlayerModal';
+import { FloatingImages } from '@/components/FloatingImages';
 import { Track } from '@/types';
 
 const QUICK_MIX = [
@@ -56,6 +57,9 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {/* Floating sticker background */}
+      <FloatingImages />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: topPad + 20, paddingBottom: bottomPad }}
@@ -66,7 +70,7 @@ export default function HomeScreen() {
             <Text style={[styles.greeting, { color: colors.mutedForeground }]}>
               {getGreeting()}
             </Text>
-            <Text style={[styles.appName, { color: colors.foreground }]}>Antigravity</Text>
+            <Text style={[styles.appName, { color: colors.foreground }]}>Abhify</Text>
           </View>
           <View style={[styles.logoWrap, { backgroundColor: colors.muted }]}>
             <Ionicons name="musical-notes" size={22} color={colors.primary} />
