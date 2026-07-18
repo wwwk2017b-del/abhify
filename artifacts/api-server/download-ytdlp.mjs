@@ -4,8 +4,8 @@ import path from 'path';
 const isWindows = process.platform === 'win32';
 const filename = isWindows ? 'yt-dlp.exe' : 'yt-dlp';
 const url = isWindows 
-  ? 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe'
-  : 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp';
+  ? 'https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe'
+  : 'https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp';
 
 console.log(`Downloading ${filename} using curl...`);
 
