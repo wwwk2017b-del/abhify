@@ -33,9 +33,16 @@ router.get("/stream/:id", (req, res) => {
     "--output", "-"
   ];
 
-  if (fs.existsSync(path.join(process.cwd(), "cookies.txt"))) {
-    ytdlpArgs.push("--cookies", path.join(process.cwd(), "cookies.txt"));
-    req.log.info({ id }, "Using cookies.txt for authentication");
+  let cookiesPath = path.join(process.cwd(), "cookies.txt");
+  if (!fs.existsSync(cookiesPath)) {
+    cookiesPath = path.join(process.cwd(), "..", "..", "cookies.txt"); // root of repo
+  }
+
+  if (fs.existsSync(cookiesPath)) {
+    ytdlpArgs.push("--cookies", cookiesPath);
+    req.log.info({ id, cookiesPath }, "Using cookies.txt for authentication");
+  } else {
+    req.log.warn("No cookies.txt found! YouTube may block the request with a captcha.");
   }
 
   ytdlpArgs.push(`https://www.youtube.com/watch?v=${id}`);
