@@ -23,16 +23,24 @@ router.get("/stream/:id", (req, res) => {
 
   req.log.info({ id }, "Stream request via local yt-dlp");
 
-  const ytdlp = spawn(YTDLP_BIN, [
+  const ytdlpArgs = [
     "--format", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
     "--no-playlist",
     "--quiet",
     "--no-warnings",
     "--no-part",
     "--extractor-args", "youtube:player_client=android,ios",
-    "--output", "-", 
-    `https://www.youtube.com/watch?v=${id}`,
-  ]);
+    "--output", "-"
+  ];
+
+  if (fs.existsSync(path.join(process.cwd(), "cookies.txt"))) {
+    ytdlpArgs.push("--cookies", path.join(process.cwd(), "cookies.txt"));
+    req.log.info({ id }, "Using cookies.txt for authentication");
+  }
+
+  ytdlpArgs.push(`https://www.youtube.com/watch?v=${id}`);
+
+  const ytdlp = spawn(YTDLP_BIN, ytdlpArgs);
 
   let headersWritten = false;
   const stderrLines: string[] = [];
