@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -21,26 +21,65 @@ router.get("/stream/:id", (req, res) => {
      return res.status(500).json({ error: `yt-dlp binary is missing at ${YTDLP_BIN}.` });
   }
 
-  req.log.info({ id }, "Stream URL extraction via local yt-dlp");
+  req.log.info({ id }, "Stream request via local yt-dlp");
 
-  execFile(YTDLP_BIN, [
+  const ytdlp = spawn(YTDLP_BIN, [
     "--format", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
-    "--get-url",
+    "--no-playlist",
+    "--quiet",
+    "--no-warnings",
+    "--no-part",
+    "--extractor-args", "youtube:player_client=android,ios",
+    "--output", "-", 
     `https://www.youtube.com/watch?v=${id}`,
-  ], (error, stdout, stderr) => {
-    if (error) {
-      req.log.error({ err: error.message, stderr }, "yt-dlp extraction failed");
-      return res.status(502).json({ error: "Stream URL extraction failed", detail: stderr || error.message });
-    }
+  ]);
 
-    const url = stdout.trim();
-    if (!url || !url.startsWith("http")) {
-      req.log.error({ url, stderr }, "Invalid URL extracted by yt-dlp");
-      return res.status(502).json({ error: "Invalid Stream URL extracted", detail: stderr });
-    }
+  let headersWritten = false;
+  const stderrLines: string[] = [];
 
-    req.log.info({ id, url }, "Redirecting client to stream URL");
-    res.redirect(302, url);
+  res.setHeader("Content-Type", "audio/mp4");
+  res.setHeader("Transfer-Encoding", "chunked");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+
+  ytdlp.stdout.on("data", (chunk: Buffer) => {
+    if (!headersWritten) {
+      headersWritten = true;
+      res.status(200);
+    }
+    res.write(chunk);
+  });
+
+  ytdlp.stderr.on("data", (chunk: Buffer) => {
+    const line = chunk.toString().trim();
+    if (line) stderrLines.push(line);
+    req.log.warn({ id, line }, "yt-dlp stderr");
+  });
+
+  ytdlp.on("error", (err) => {
+    req.log.error({ err, id }, "yt-dlp spawn error");
+    if (!headersWritten) {
+      res.status(500).json({
+        error: "yt-dlp could not start",
+        detail: err.message,
+      });
+    } else {
+      res.end();
+    }
+  });
+
+  ytdlp.on("close", (code) => {
+    if (!headersWritten) {
+      const detail = stderrLines.join("\n") || `exited with code ${code}`;
+      req.log.error({ id, code, detail }, "yt-dlp exited without data");
+      res.status(502).json({ error: "Stream failed", detail });
+    } else {
+      res.end();
+    }
+  });
+
+  req.on("close", () => {
+    ytdlp.kill("SIGTERM");
   });
 });
 
