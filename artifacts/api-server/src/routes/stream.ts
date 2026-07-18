@@ -1,70 +1,89 @@
 import { Router } from "express";
-import ytdl from "@distube/ytdl-core";
+import { spawn } from "node:child_process";
 
 const router = Router();
 
-router.get("/stream/:id", async (req, res) => {
+// Path where pip3 installs yt-dlp
+const YTDLP_BIN = "yt-dlp";
+
+/**
+ * GET /api/stream/:id
+ *
+ * Spawns yt-dlp to extract and pipe the best audio-only stream for the
+ * given YouTube video ID.  No third-party proxy needed — yt-dlp handles
+ * YouTube's bot-detection internally.
+ */
+router.get("/stream/:id", (req, res) => {
   const { id } = req.params;
 
   if (!id || !/^[a-zA-Z0-9_-]{11}$/.test(id)) {
     return res.status(400).json({ error: "Invalid video ID" });
   }
 
-  const url = `https://www.youtube.com/watch?v=${id}`;
+  req.log.info({ id }, "Stream request via yt-dlp");
 
-  req.log.info({ id }, "Stream request");
+  // Best audio: prefer m4a (AAC) for maximum expo-av compatibility, then webm/opus
+  const ytdlp = spawn(YTDLP_BIN, [
+    "--format",
+    "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
+    "--no-playlist",
+    "--quiet",
+    "--no-warnings",
+    "--no-part",
+    "--output",
+    "-", // pipe to stdout
+    `https://www.youtube.com/watch?v=${id}`,
+  ]);
 
-  try {
-    // Validate the video is accessible before committing headers
-    const info = await ytdl.getInfo(url);
-    const format = ytdl.chooseFormat(info.formats, {
-      quality: "highestaudio",
-      filter: "audioonly",
-    });
+  let headersWritten = false;
+  const stderrLines: string[] = [];
 
-    if (!format) {
-      return res.status(404).json({ error: "No audio format found" });
+  // Set headers before first byte arrives
+  res.setHeader("Content-Type", "audio/mp4");
+  res.setHeader("Transfer-Encoding", "chunked");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+
+  ytdlp.stdout.on("data", (chunk: Buffer) => {
+    if (!headersWritten) {
+      headersWritten = true;
+      res.status(200);
     }
+    res.write(chunk);
+  });
 
-    const contentLength = format.contentLength
-      ? parseInt(format.contentLength, 10)
-      : undefined;
+  ytdlp.stderr.on("data", (chunk: Buffer) => {
+    const line = chunk.toString().trim();
+    if (line) stderrLines.push(line);
+    req.log.warn({ id, line }, "yt-dlp stderr");
+  });
 
-    res.setHeader("Content-Type", format.mimeType ?? "audio/mpeg");
-    res.setHeader("Transfer-Encoding", "chunked");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    if (contentLength) {
-      res.setHeader("Content-Length", contentLength);
-      res.setHeader("Accept-Ranges", "bytes");
+  ytdlp.on("error", (err) => {
+    req.log.error({ err, id }, "yt-dlp spawn error");
+    if (!headersWritten) {
+      res.status(500).json({
+        error: "yt-dlp could not start",
+        detail: err.message,
+      });
+    } else {
+      res.end();
     }
+  });
 
-    const audioStream = ytdl(url, {
-      format,
-      highWaterMark: 1 << 25, // 32 MB buffer for smoother streaming
-    });
-
-    audioStream.pipe(res);
-
-    req.on("close", () => audioStream.destroy());
-
-    audioStream.on("error", (err) => {
-      req.log.error({ err }, "Audio stream error");
-      if (!res.headersSent) {
-        res.status(500).json({ error: "Stream failed" });
-      } else {
-        res.end();
-      }
-    });
-  } catch (err: any) {
-    req.log.error({ err }, "Stream error");
-    const msg = err?.message ?? "";
-    const status =
-      msg.includes("Sign in") || msg.includes("bot") ? 451 : 500;
-    if (!res.headersSent) {
-      res.status(status).json({ error: "Could not get audio stream", detail: msg });
+  ytdlp.on("close", (code) => {
+    if (!headersWritten) {
+      const detail = stderrLines.join("\n") || `exited with code ${code}`;
+      req.log.error({ id, code, detail }, "yt-dlp exited without data");
+      res.status(502).json({ error: "Stream failed", detail });
+    } else {
+      res.end();
     }
-  }
+  });
+
+  // Client disconnected — kill the yt-dlp process immediately
+  req.on("close", () => {
+    ytdlp.kill("SIGTERM");
+  });
 });
 
 export default router;

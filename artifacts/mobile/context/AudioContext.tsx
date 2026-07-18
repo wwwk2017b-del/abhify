@@ -1,10 +1,18 @@
-import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
-import { Audio } from 'expo-av';
-import type { AVPlaybackStatus } from 'expo-av';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Track, RepeatMode } from '@/types';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+} from "react";
+import { Alert } from "react-native";
+import { Audio } from "expo-av";
+import type { AVPlaybackStatus } from "expo-av";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Track, RepeatMode } from "@/types";
 
-const RECENTLY_PLAYED_KEY = '@antigravity:recently_played';
+const RECENTLY_PLAYED_KEY = "@abhify:recently_played";
 const MAX_RECENTLY_PLAYED = 30;
 
 interface AudioContextType {
@@ -34,18 +42,25 @@ interface AudioContextType {
 
 const AudioContext = createContext<AudioContextType | null>(null);
 
+function showPlayError(trackTitle: string, err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error("[AudioContext] Play error:", msg);
+  Alert.alert(
+    "⚠️ Playback Failed",
+    `Could not play "${trackTitle}".\n\nError: ${msg}`,
+  );
+}
+
 export function AudioProvider({ children }: { children: React.ReactNode }) {
   const soundRef = useRef<Audio.Sound | null>(null);
 
-  // Refs for stable access inside callbacks (avoids stale closure)
   const queueRef = useRef<Track[]>([]);
   const queueIndexRef = useRef(0);
-  const repeatRef = useRef<RepeatMode>('none');
+  const repeatRef = useRef<RepeatMode>("none");
   const shuffleRef = useRef(false);
-  const recentlyPlayedRef = useRef<Track[]>([]);
   const isLoadingRef = useRef(false);
+  const currentTrackRef = useRef<Track | null>(null);
 
-  // React state for rendering
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
@@ -55,7 +70,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [queue, setQueueState] = useState<Track[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
   const [shuffle, setShuffle] = useState(false);
-  const [repeat, setRepeat] = useState<RepeatMode>('none');
+  const [repeat, setRepeat] = useState<RepeatMode>("none");
   const [volume, setVolumeState] = useState(1.0);
   const [showPlayer, setShowPlayer] = useState(false);
 
@@ -67,71 +82,45 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     });
     loadRecentlyPlayed();
     return () => {
-      soundRef.current?.unloadAsync();
+      soundRef.current?.unloadAsync().catch(() => {});
     };
   }, []);
 
   const loadRecentlyPlayed = async () => {
     try {
       const data = await AsyncStorage.getItem(RECENTLY_PLAYED_KEY);
-      if (data) {
-        const tracks = JSON.parse(data) as Track[];
-        recentlyPlayedRef.current = tracks;
-        setRecentlyPlayed(tracks);
-      }
-    } catch {}
+      if (data) setRecentlyPlayed(JSON.parse(data) as Track[]);
+    } catch (e) {
+      console.warn(e);
+    }
   };
 
   const saveRecentlyPlayed = async (track: Track) => {
     const updated = [
       track,
-      ...recentlyPlayedRef.current.filter((t) => t.id !== track.id),
+      ...recentlyPlayed.filter((t) => t.id !== track.id),
     ].slice(0, MAX_RECENTLY_PLAYED);
-    recentlyPlayedRef.current = updated;
     setRecentlyPlayed(updated);
     try {
       await AsyncStorage.setItem(RECENTLY_PLAYED_KEY, JSON.stringify(updated));
-    } catch {}
+    } catch (e) {
+      console.warn(e);
+    }
   };
 
-  // Stable load function that reads exclusively from refs
-  const internalLoadAndPlay = useCallback(async (track: Track) => {
-    if (isLoadingRef.current) return;
-    isLoadingRef.current = true;
-    setIsLoading(true);
-    setCurrentTrack(track);
-    setPositionMs(0);
-    setDurationMs(track.duration * 1000);
-
-    try {
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
+  const onPlaybackStatusUpdate = useCallback((status: AVPlaybackStatus) => {
+    if (!status.isLoaded) {
+      if ((status as any).error) {
+        const track = currentTrackRef.current;
+        const errMsg = (status as any).error;
+        setIsPlaying(false);
+        setIsLoading(false);
+        isLoadingRef.current = false;
+        if (track) showPlayError(track.title, errMsg);
       }
-
-      const domain = process.env.EXPO_PUBLIC_DOMAIN ?? 'localhost';
-      const streamUrl = `https://${domain}/api/stream/${track.id}`;
-
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: streamUrl },
-        { shouldPlay: true, progressUpdateIntervalMillis: 500, volume: 1.0 },
-        (status: AVPlaybackStatus) => handlePlaybackStatusRef.current?.(status),
-      );
-      soundRef.current = sound;
-      await saveRecentlyPlayed(track);
-    } catch {
-      setIsPlaying(false);
-    } finally {
-      isLoadingRef.current = false;
-      setIsLoading(false);
+      return;
     }
-  }, []); // stable — reads only from refs and stable setters
 
-  // Status callback ref — always points to latest closure without recreating the Sound
-  const handlePlaybackStatusRef = useRef<(status: AVPlaybackStatus) => void>();
-
-  handlePlaybackStatusRef.current = (status: AVPlaybackStatus) => {
-    if (!status.isLoaded) return;
     setIsPlaying(status.isPlaying);
     setPositionMs(status.positionMillis);
     if (status.durationMillis != null) setDurationMs(status.durationMillis);
@@ -142,36 +131,124 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       const rep = repeatRef.current;
       const shuf = shuffleRef.current;
 
-      if (rep === 'one') {
-        soundRef.current?.replayAsync();
+      if (rep === "one") {
+        soundRef.current?.replayAsync().catch(() => {});
         return;
       }
       if (q.length === 0) return;
 
-      let nextIdx: number;
-      if (shuf) {
-        nextIdx = Math.floor(Math.random() * q.length);
-      } else {
-        nextIdx = idx + 1;
-        if (nextIdx >= q.length) {
-          if (rep === 'all') nextIdx = 0;
-          else return;
-        }
+      let nextIdx = shuf ? Math.floor(Math.random() * q.length) : idx + 1;
+      if (nextIdx >= q.length) {
+        if (rep === "all") nextIdx = 0;
+        else return;
       }
       queueIndexRef.current = nextIdx;
       setQueueIndex(nextIdx);
-      internalLoadAndPlay(q[nextIdx]);
+      const nextTrack = q[nextIdx];
+      if (nextTrack) internalLoadAndPlay(nextTrack);
     }
-  };
+  }, []);
+
+  const internalLoadAndPlay = useCallback(
+    async (track: Track) => {
+      if (isLoadingRef.current) return;
+      isLoadingRef.current = true;
+      setIsLoading(true);
+      setIsPlaying(false);
+      setCurrentTrack(track);
+      currentTrackRef.current = track;
+      setPositionMs(0);
+      setDurationMs(track.duration > 0 ? track.duration * 1000 : 0);
+
+      if (soundRef.current) {
+        try {
+          await soundRef.current.stopAsync();
+          await soundRef.current.unloadAsync();
+        } catch {}
+        soundRef.current = null;
+      }
+
+      // FRESH ENDPOINT CLUSTER
+      const apiMirrors = [
+        "https://pipedapi.adminforge.de",
+        "https://pipedapi.leptons.xyz",
+        "https://pipedapi.reallyaweso.me",
+        "https://piped-api.lunar.icu",
+        "https://api.piped.yt",
+      ];
+
+      let audioStreamUrl = "";
+      let lastError = "All servers timed out.";
+
+      for (const mirror of apiMirrors) {
+        try {
+          const targetUrl = `${mirror}/streams/${track.id}`;
+          console.log(
+            `[AudioContext] Trying target cluster node: ${targetUrl}`,
+          );
+
+          // Increased safety window to 10 seconds for deep parsing
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+          const res = await fetch(targetUrl, { signal: controller.signal });
+          clearTimeout(timeoutId);
+
+          if (!res.ok) throw new Error(`Status ${res.status}`);
+
+          const streamData = await res.json();
+          const audioStream =
+            streamData.audioStreams?.find((s: any) =>
+              s.mimeType?.includes("audio"),
+            ) || streamData.audioStreams?.[0];
+
+          if (audioStream?.url) {
+            audioStreamUrl = audioStream.url;
+            console.log(
+              `[AudioContext] Connected successfully using node: ${mirror}`,
+            );
+            break;
+          }
+        } catch (err: any) {
+          console.warn(
+            `[AudioContext] Shifting from node ${mirror}:`,
+            err.message || err,
+          );
+          lastError = err.message || String(err);
+        }
+      }
+
+      try {
+        if (!audioStreamUrl)
+          throw new Error(`Music pipeline full. Details: ${lastError}`);
+
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: audioStreamUrl },
+          { shouldPlay: true, progressUpdateIntervalMillis: 500, volume: 1.0 },
+          onPlaybackStatusUpdate,
+        );
+
+        soundRef.current = sound;
+        await saveRecentlyPlayed(track);
+      } catch (err) {
+        setIsPlaying(false);
+        soundRef.current = null;
+        showPlayError(track.title, err);
+      } finally {
+        isLoadingRef.current = false;
+        setIsLoading(false);
+      }
+    },
+    [onPlaybackStatusUpdate],
+  );
 
   const playTrack = async (track: Track, newQueue?: Track[]) => {
-    if (newQueue) {
+    if (newQueue && newQueue.length > 0) {
       queueRef.current = newQueue;
       setQueueState(newQueue);
       const idx = newQueue.findIndex((t) => t.id === track.id);
-      const safeIdx = idx >= 0 ? idx : 0;
-      queueIndexRef.current = safeIdx;
-      setQueueIndex(safeIdx);
+      queueIndexRef.current = idx >= 0 ? idx : 0;
+      setQueueIndex(queueIndexRef.current);
     }
     setShowPlayer(true);
     await internalLoadAndPlay(track);
@@ -179,32 +256,40 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
   const togglePlay = async () => {
     if (!soundRef.current) return;
-    if (isPlaying) {
-      await soundRef.current.pauseAsync();
-    } else {
-      await soundRef.current.playAsync();
+    try {
+      const status = await soundRef.current.getStatusAsync();
+      if (status.isLoaded) {
+        if (status.isPlaying) await soundRef.current.pauseAsync();
+        else await soundRef.current.playAsync();
+      }
+    } catch (err) {
+      console.warn(err);
     }
   };
 
   const seekTo = async (ms: number) => {
-    await soundRef.current?.setPositionAsync(ms);
-    setPositionMs(ms);
+    try {
+      await soundRef.current?.setPositionAsync(ms);
+      setPositionMs(ms);
+    } catch (err) {
+      console.warn(err);
+    }
   };
 
   const skipNext = async () => {
     const q = queueRef.current;
     if (q.length === 0) return;
-    const idx = queueIndexRef.current;
-    const shuf = shuffleRef.current;
-    const rep = repeatRef.current;
-    let nextIdx = shuf ? Math.floor(Math.random() * q.length) : idx + 1;
+    let nextIdx = shuffleRef.current
+      ? Math.floor(Math.random() * q.length)
+      : queueIndexRef.current + 1;
     if (nextIdx >= q.length) {
-      if (rep === 'all') nextIdx = 0;
+      if (repeatRef.current === "all") nextIdx = 0;
       else return;
     }
     queueIndexRef.current = nextIdx;
     setQueueIndex(nextIdx);
-    await internalLoadAndPlay(q[nextIdx]);
+    const nextTrack = q[nextIdx];
+    if (nextTrack) await internalLoadAndPlay(nextTrack);
   };
 
   const skipPrev = async () => {
@@ -214,35 +299,35 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }
     const q = queueRef.current;
     if (q.length === 0) return;
-    const idx = queueIndexRef.current;
-    const prevIdx = (idx - 1 + q.length) % q.length;
+    const prevIdx = (queueIndexRef.current - 1 + q.length) % q.length;
     queueIndexRef.current = prevIdx;
     setQueueIndex(prevIdx);
-    await internalLoadAndPlay(q[prevIdx]);
+    const prevTrack = q[prevIdx];
+    if (prevTrack) await internalLoadAndPlay(prevTrack);
   };
 
   const toggleShuffle = () => {
-    const next = !shuffleRef.current;
-    shuffleRef.current = next;
-    setShuffle(next);
+    shuffleRef.current = !shuffleRef.current;
+    setShuffle(shuffleRef.current);
   };
 
   const toggleRepeat = () => {
-    const order: RepeatMode[] = ['none', 'all', 'one'];
-    const next = order[(order.indexOf(repeatRef.current) + 1) % order.length];
+    const order: RepeatMode[] = ["none", "all", "one"];
+    const next = order[(order.indexOf(repeatRef.current) + 1) % order.length]!;
     repeatRef.current = next;
     setRepeat(next);
   };
 
   const setVolume = async (v: number) => {
     setVolumeState(v);
-    await soundRef.current?.setVolumeAsync(v);
+    try {
+      await soundRef.current?.setVolumeAsync(v);
+    } catch {}
   };
 
   const addToQueue = (track: Track) => {
-    const updated = [...queueRef.current, track];
-    queueRef.current = updated;
-    setQueueState(updated);
+    queueRef.current = [...queueRef.current, track];
+    setQueueState(queueRef.current);
   };
 
   return (
@@ -266,10 +351,10 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         seekTo,
         skipNext,
         skipPrev,
-        toggleShuffle,
-        toggleRepeat,
         setVolume,
         addToQueue,
+        toggleShuffle,
+        toggleRepeat,
       }}
     >
       {children}
@@ -279,6 +364,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
 export function useAudio() {
   const ctx = useContext(AudioContext);
-  if (!ctx) throw new Error('useAudio must be used within AudioProvider');
+  if (!ctx) throw new Error("useAudio must be used within AudioProvider");
   return ctx;
 }
