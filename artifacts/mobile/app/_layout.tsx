@@ -16,8 +16,10 @@ import * as SplashScreen from 'expo-splash-screen';
 import { setBaseUrl } from '@workspace/api-client-react';
 import { AudioProvider } from '@/context/AudioContext';
 
+import { API_URL } from '@/constants/api';
+
 // Set the API base URL for the generated client
-setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
+setBaseUrl(API_URL);
 
 SplashScreen.preventAutoHideAsync();
 

@@ -1,18 +1,16 @@
 import { Router } from "express";
 import { spawn } from "node:child_process";
+import path from "node:path";
+import fs from "node:fs";
 
 const router = Router();
 
-// Path where pip3 installs yt-dlp
-const YTDLP_BIN = "yt-dlp";
+// Determine if we are on Windows or Linux (Render)
+const isWindows = process.platform === "win32";
+const YTDLP_BIN = isWindows 
+  ? path.resolve(process.cwd(), "yt-dlp.exe")
+  : path.resolve(process.cwd(), "yt-dlp");
 
-/**
- * GET /api/stream/:id
- *
- * Spawns yt-dlp to extract and pipe the best audio-only stream for the
- * given YouTube video ID.  No third-party proxy needed — yt-dlp handles
- * YouTube's bot-detection internally.
- */
 router.get("/stream/:id", (req, res) => {
   const { id } = req.params;
 
@@ -20,9 +18,13 @@ router.get("/stream/:id", (req, res) => {
     return res.status(400).json({ error: "Invalid video ID" });
   }
 
-  req.log.info({ id }, "Stream request via yt-dlp");
+  // Fallback to check if yt-dlp is downloaded
+  if (!fs.existsSync(YTDLP_BIN)) {
+     return res.status(500).json({ error: `yt-dlp binary is missing at ${YTDLP_BIN}.` });
+  }
 
-  // Best audio: prefer m4a (AAC) for maximum expo-av compatibility, then webm/opus
+  req.log.info({ id }, "Stream request via local yt-dlp");
+
   const ytdlp = spawn(YTDLP_BIN, [
     "--format",
     "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
@@ -31,14 +33,13 @@ router.get("/stream/:id", (req, res) => {
     "--no-warnings",
     "--no-part",
     "--output",
-    "-", // pipe to stdout
+    "-", 
     `https://www.youtube.com/watch?v=${id}`,
   ]);
 
   let headersWritten = false;
   const stderrLines: string[] = [];
 
-  // Set headers before first byte arrives
   res.setHeader("Content-Type", "audio/mp4");
   res.setHeader("Transfer-Encoding", "chunked");
   res.setHeader("Cache-Control", "no-cache");
@@ -80,7 +81,6 @@ router.get("/stream/:id", (req, res) => {
     }
   });
 
-  // Client disconnected — kill the yt-dlp process immediately
   req.on("close", () => {
     ytdlp.kill("SIGTERM");
   });

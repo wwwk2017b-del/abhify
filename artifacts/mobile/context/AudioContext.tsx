@@ -11,6 +11,7 @@ import { Audio } from "expo-av";
 import type { AVPlaybackStatus } from "expo-av";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Track, RepeatMode } from "@/types";
+import { API_URL } from '@/constants/api';
 
 const RECENTLY_PLAYED_KEY = "@abhify:recently_played";
 const MAX_RECENTLY_PLAYED = 30;
@@ -168,55 +169,9 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         soundRef.current = null;
       }
 
-      // FRESH ENDPOINT CLUSTER
-      const apiMirrors = [
-        "https://pipedapi.adminforge.de",
-        "https://pipedapi.leptons.xyz",
-        "https://pipedapi.reallyaweso.me",
-        "https://piped-api.lunar.icu",
-        "https://api.piped.yt",
-      ];
-
-      let audioStreamUrl = "";
-      let lastError = "All servers timed out.";
-
-      for (const mirror of apiMirrors) {
-        try {
-          const targetUrl = `${mirror}/streams/${track.id}`;
-          console.log(
-            `[AudioContext] Trying target cluster node: ${targetUrl}`,
-          );
-
-          // Increased safety window to 10 seconds for deep parsing
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-          const res = await fetch(targetUrl, { signal: controller.signal });
-          clearTimeout(timeoutId);
-
-          if (!res.ok) throw new Error(`Status ${res.status}`);
-
-          const streamData = await res.json();
-          const audioStream =
-            streamData.audioStreams?.find((s: any) =>
-              s.mimeType?.includes("audio"),
-            ) || streamData.audioStreams?.[0];
-
-          if (audioStream?.url) {
-            audioStreamUrl = audioStream.url;
-            console.log(
-              `[AudioContext] Connected successfully using node: ${mirror}`,
-            );
-            break;
-          }
-        } catch (err: any) {
-          console.warn(
-            `[AudioContext] Shifting from node ${mirror}:`,
-            err.message || err,
-          );
-          lastError = err.message || String(err);
-        }
-      }
+      // Using our own stream endpoint via yt-dlp to avoid Piped API unreliability
+      const audioStreamUrl = `${API_URL}/api/stream/${track.id}`;
+      const lastError = "Stream URL not available";
 
       try {
         if (!audioStreamUrl)

@@ -14,7 +14,7 @@ router.get("/search", async (req, res) => {
   req.log.info({ q, limit }, "Search request");
 
   try {
-    const result = await ytSearch(q);
+    const result = await ytSearch({ query: q, hl: "en", gl: "US" });
 
     const tracks = result.videos
       .filter((v) => v.videoId && v.title && v.seconds > 0)
