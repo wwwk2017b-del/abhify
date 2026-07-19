@@ -169,11 +169,16 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         soundRef.current = null;
       }
 
-      // Using our own stream endpoint via yt-dlp to avoid Piped API unreliability
-      const audioStreamUrl = `${API_URL}/api/stream/${track.id}`;
+      let audioStreamUrl = "";
       const lastError = "Stream URL not available";
 
       try {
+        // Pre-fetch the URL to completely bypass ExoPlayer's aggressive read timeout
+        const prepRes = await fetch(`${API_URL}/api/prepare-stream/${track.id}`);
+        if (!prepRes.ok) throw new Error("Failed to prepare stream. Status: " + prepRes.status);
+        const prepData = await prepRes.json();
+        audioStreamUrl = prepData.proxyUrl;
+
         if (!audioStreamUrl)
           throw new Error(`Music pipeline full. Details: ${lastError}`);
 
