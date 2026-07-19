@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
@@ -10,15 +10,17 @@ const YTDLP_BIN = isWindows
   ? path.resolve(process.cwd(), "yt-dlp.exe")
   : path.resolve(process.cwd(), "yt-dlp");
 
-router.get("/stream/:id", (req, res) => {
+router.get("/stream/:id", (req: Request, res: Response, next: NextFunction): void => {
   const { id } = req.params;
 
-  if (!id || !/^[a-zA-Z0-9_-]{11}$/.test(id)) {
-    return res.status(400).json({ error: "Invalid video ID" });
+  if (!id || typeof id !== 'string' || !/^[a-zA-Z0-9_-]{11}$/.test(id)) {
+    res.status(400).json({ error: "Invalid video ID" });
+    return;
   }
 
   if (!fs.existsSync(YTDLP_BIN)) {
-     return res.status(500).json({ error: `yt-dlp binary is missing at ${YTDLP_BIN}.` });
+     res.status(500).json({ error: `yt-dlp binary is missing at ${YTDLP_BIN}.` });
+     return;
   }
 
   req.log.info({ id }, "Stream request via local yt-dlp");
@@ -29,7 +31,6 @@ router.get("/stream/:id", (req, res) => {
     "--quiet",
     "--no-warnings",
     "--no-part",
-    "--extractor-args", "youtube:player_client=android,ios",
     "--output", "-"
   ];
 

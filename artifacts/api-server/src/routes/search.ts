@@ -1,12 +1,23 @@
-import { Router } from "express";
-import ytSearch from "yt-search";
+import { Router, Request, Response, NextFunction } from "express";
+import { search } from "youtube-ext";
 
 const router = Router();
 
-router.get("/search", async (req, res) => {
+function parseDuration(text: string | undefined): number {
+  if (!text) return 0;
+  const parts = text.split(':').reverse();
+  let secs = 0;
+  for (let i = 0; i < parts.length; i++) {
+    secs += parseInt(parts[i] || "0", 10) * Math.pow(60, i);
+  }
+  return secs;
+}
+
+router.get("/search", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const q = typeof req.query["q"] === "string" ? req.query["q"].trim() : "";
   if (!q) {
-    return res.status(400).json({ error: "Query is required" });
+    res.status(400).json({ error: "Query is required" });
+    return;
   }
   const rawLimit = Number(req.query["limit"]);
   const limit = isNaN(rawLimit) || rawLimit < 1 ? 20 : Math.min(rawLimit, 50);
@@ -14,21 +25,24 @@ router.get("/search", async (req, res) => {
   req.log.info({ q, limit }, "Search request");
 
   try {
-    const result = await ytSearch({ query: q, hl: "en", gl: "US" });
+    const result = await search(q);
 
     const tracks = result.videos
-      .filter((v) => v.videoId && v.title && v.seconds > 0)
+      .filter((v: any) => v.id && v.title)
       .slice(0, limit)
-      .map((v) => ({
-        id: v.videoId,
-        title: v.title,
-        artist: v.author?.name ?? "Unknown Artist",
-        duration: v.seconds,
-        durationFormatted: v.timestamp ?? `${Math.floor(v.seconds / 60)}:${String(v.seconds % 60).padStart(2, "0")}`,
-        thumbnail:
-          v.thumbnail ??
-          `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`,
-      }));
+      .map((v: any) => {
+        const secs = parseDuration(v.duration?.text);
+        return {
+          id: v.id,
+          title: v.title,
+          artist: v.channel?.name ?? "Unknown Artist",
+          duration: secs,
+          durationFormatted: v.duration?.text || `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`,
+          thumbnail:
+            v.thumbnails?.[0]?.url ??
+            `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,
+        };
+      });
 
     req.log.info({ q, count: tracks.length }, "Search results");
     res.json(tracks);
