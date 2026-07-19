@@ -60,37 +60,24 @@ router.get("/stream/:id", (req: Request, res: Response, next: NextFunction): voi
     req.log.warn("No cookies.txt found! YouTube may block the request with a captcha.");
   }
 
-  ytdlpArgs.push(`https://www.youtube.com/watch?v=${id}`);
+  ytdlpArgs.push("--get-url", `https://www.youtube.com/watch?v=${id}`);
 
-  res.status(200);
-  res.setHeader("Content-Type", "audio/mp4");
-  res.setHeader("Transfer-Encoding", "chunked");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  // Flush headers immediately so the client (ExoPlayer) doesn't timeout waiting for yt-dlp to start
-  res.flushHeaders();
+  const { execFile } = require("node:child_process");
 
-  const ytdlp = spawn(YTDLP_BIN, ytdlpArgs);
+  execFile(YTDLP_BIN, ytdlpArgs, { maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    if (error) {
+      req.log.error({ err: error, id, stderr }, "yt-dlp failed to get URL");
+      return res.status(502).json({ error: "Stream failed", detail: stderr });
+    }
 
-  const stderrLines: string[] = [];
-
-  ytdlp.stdout.on("data", (chunk: Buffer) => {
-    res.write(chunk);
-  });
-
-  ytdlp.stderr.on("data", (chunk: Buffer) => {
-    const line = chunk.toString().trim();
-    if (line) stderrLines.push(line);
-    req.log.warn({ id, line }, "yt-dlp stderr");
-  });
-
-  ytdlp.on("error", (err) => {
-    req.log.error({ err, id }, "yt-dlp spawn error");
-    res.end();
-  });
-
-  ytdlp.on("close", (code) => {
-    res.end();
+    const url = stdout.trim().split("\n")[0];
+    if (url && url.startsWith("http")) {
+      req.log.info({ id }, "Redirecting client to direct YouTube URL");
+      return res.redirect(302, url);
+    } else {
+      req.log.error({ id, stdout }, "yt-dlp returned invalid URL");
+      return res.status(502).json({ error: "Invalid stream URL", detail: stdout });
+    }
   });
 
   req.on("close", () => {
