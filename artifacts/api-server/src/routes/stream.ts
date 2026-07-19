@@ -32,6 +32,7 @@ router.get("/stream/:id", (req: Request, res: Response, next: NextFunction): voi
     "--no-playlist",
     "--quiet",
     "--no-warnings",
+    "--js-runtimes", "node",
     "--no-part",
     "--output", "-"
   ];
