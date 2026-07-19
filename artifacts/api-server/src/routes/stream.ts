@@ -3,6 +3,8 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
 
+import os from "node:os";
+
 const router = Router();
 
 const isWindows = process.platform === "win32";
@@ -39,6 +41,18 @@ router.get("/stream/:id", (req: Request, res: Response, next: NextFunction): voi
     cookiesPath = path.join(process.cwd(), "..", "..", "cookies.txt"); // root of repo
   }
 
+  // Support for environment variable cookies (useful for Render/Vercel/Heroku)
+  if (process.env.YOUTUBE_COOKIE || process.env.COOKIE) {
+    try {
+      const tempCookiePath = path.join(os.tmpdir(), "youtube_cookies.txt");
+      fs.writeFileSync(tempCookiePath, process.env.YOUTUBE_COOKIE || process.env.COOKIE || "");
+      cookiesPath = tempCookiePath;
+      req.log.info("Written environment cookie to temp file");
+    } catch (e) {
+      req.log.warn("Failed to write temp cookie file");
+    }
+  }
+
   if (fs.existsSync(cookiesPath)) {
     ytdlpArgs.push("--cookies", cookiesPath);
     req.log.info({ id, cookiesPath }, "Using cookies.txt for authentication");
@@ -48,21 +62,19 @@ router.get("/stream/:id", (req: Request, res: Response, next: NextFunction): voi
 
   ytdlpArgs.push(`https://www.youtube.com/watch?v=${id}`);
 
-  const ytdlp = spawn(YTDLP_BIN, ytdlpArgs);
-
-  let headersWritten = false;
-  const stderrLines: string[] = [];
-
+  res.status(200);
   res.setHeader("Content-Type", "audio/mp4");
   res.setHeader("Transfer-Encoding", "chunked");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Access-Control-Allow-Origin", "*");
+  // Flush headers immediately so the client (ExoPlayer) doesn't timeout waiting for yt-dlp to start
+  res.flushHeaders();
+
+  const ytdlp = spawn(YTDLP_BIN, ytdlpArgs);
+
+  const stderrLines: string[] = [];
 
   ytdlp.stdout.on("data", (chunk: Buffer) => {
-    if (!headersWritten) {
-      headersWritten = true;
-      res.status(200);
-    }
     res.write(chunk);
   });
 
@@ -74,24 +86,11 @@ router.get("/stream/:id", (req: Request, res: Response, next: NextFunction): voi
 
   ytdlp.on("error", (err) => {
     req.log.error({ err, id }, "yt-dlp spawn error");
-    if (!headersWritten) {
-      res.status(500).json({
-        error: "yt-dlp could not start",
-        detail: err.message,
-      });
-    } else {
-      res.end();
-    }
+    res.end();
   });
 
   ytdlp.on("close", (code) => {
-    if (!headersWritten) {
-      const detail = stderrLines.join("\n") || `exited with code ${code}`;
-      req.log.error({ id, code, detail }, "yt-dlp exited without data");
-      res.status(502).json({ error: "Stream failed", detail });
-    } else {
-      res.end();
-    }
+    res.end();
   });
 
   req.on("close", () => {
