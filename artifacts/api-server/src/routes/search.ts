@@ -1,17 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { search } from "youtube-ext";
 
 const router = Router();
-
-function parseDuration(text: string | undefined): number {
-  if (!text) return 0;
-  const parts = text.split(':').reverse();
-  let secs = 0;
-  for (let i = 0; i < parts.length; i++) {
-    secs += parseInt(parts[i] || "0", 10) * Math.pow(60, i);
-  }
-  return secs;
-}
 
 router.get("/search", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const q = typeof req.query["q"] === "string" ? req.query["q"].trim() : "";
@@ -22,27 +11,27 @@ router.get("/search", async (req: Request, res: Response, next: NextFunction): P
   const rawLimit = Number(req.query["limit"]);
   const limit = isNaN(rawLimit) || rawLimit < 1 ? 20 : Math.min(rawLimit, 50);
 
-  req.log.info({ q, limit }, "Search request");
+  req.log.info({ q, limit }, "Search request (JioSaavn)");
 
   try {
-    const result = await search(q);
+    const response = await fetch(`https://www.jiosaavn.com/api.php?__call=autocomplete.get&query=${encodeURIComponent(q)}&_format=json&_marker=0&ctx=android`);
+    const data = await response.json();
 
-    const tracks = result.videos
-      .filter((v: any) => v.id && v.title)
-      .slice(0, limit)
-      .map((v: any) => {
-        const secs = parseDuration(v.duration?.text);
-        return {
-          id: v.id,
-          title: v.title,
-          artist: v.channel?.name ?? "Unknown Artist",
-          duration: secs,
-          durationFormatted: v.duration?.text || `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`,
-          thumbnail:
-            v.thumbnails?.[0]?.url ??
-            `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,
-        };
-      });
+    if (!data || !data.songs || !data.songs.data) {
+      res.json([]);
+      return;
+    }
+
+    const tracks = data.songs.data.slice(0, limit).map((v: any) => {
+      return {
+        id: v.id,
+        title: v.title,
+        artist: v.more_info?.primary_artists || v.description || "Unknown Artist",
+        duration: 0, // JioSaavn autocomplete doesn't return duration, we can set 0 or fetch detailed info
+        durationFormatted: "",
+        thumbnail: (v.image || "").replace("50x50", "500x500") // Get higher res image
+      };
+    });
 
     req.log.info({ q, count: tracks.length }, "Search results");
     res.json(tracks);
