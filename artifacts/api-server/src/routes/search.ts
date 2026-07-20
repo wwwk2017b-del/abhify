@@ -14,22 +14,24 @@ router.get("/search", async (req: Request, res: Response, next: NextFunction): P
   req.log.info({ q, limit }, "Search request (JioSaavn)");
 
   try {
-    const response = await fetch(`https://www.jiosaavn.com/api.php?__call=autocomplete.get&query=${encodeURIComponent(q)}&_format=json&_marker=0&ctx=android`);
+    // Switch to search.getResults instead of autocomplete to get 20+ results with durations!
+    const response = await fetch(`https://www.jiosaavn.com/api.php?__call=search.getResults&q=${encodeURIComponent(q)}&n=${limit}&p=1&_format=json&_marker=0&ctx=android`);
     const data = await response.json();
 
-    if (!data || !data.songs || !data.songs.data) {
+    if (!data || !data.results) {
       res.json([]);
       return;
     }
 
-    const tracks = data.songs.data.slice(0, limit).map((v: any) => {
+    const tracks = data.results.map((v: any) => {
+      const secs = parseInt(v.duration || "0", 10);
       return {
         id: v.id,
-        title: v.title,
-        artist: v.more_info?.primary_artists || v.description || "Unknown Artist",
-        duration: 0, // JioSaavn autocomplete doesn't return duration, we can set 0 or fetch detailed info
-        durationFormatted: "",
-        thumbnail: (v.image || "").replace("50x50", "500x500") // Get higher res image
+        title: v.song || v.title,
+        artist: v.primary_artists || v.description || "Unknown Artist",
+        duration: secs, 
+        durationFormatted: `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`,
+        thumbnail: (v.image || "").replace("150x150", "500x500").replace("50x50", "500x500")
       };
     });
 
